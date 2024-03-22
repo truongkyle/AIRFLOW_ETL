@@ -1,0 +1,15 @@
+version: '3.0'
+
+services:
+  play-dice-container:
+    image: apache/airflow:2.3.0-python3.8
+    volumes:
+      - ./dags:/opt/airflow/dags
+
+    ports:
+      - 8080:8080
+    
+    command: bash -c '(airflow db init && airflow users create --username admin --password admin --firstname Htd --lastname Coserv --role Admin --email kl@gmail.com); airflow webserver & airflow scheduler'
+
+volumes:
+  dags:
