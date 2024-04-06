@@ -23,10 +23,10 @@ class MySQLIOManager():
     def handle_output(self):
         pass
 
-    def load_input(self) -> pd.DataFrame:
+    def load_input(self):
         pass
     
-    def extract_data(self, sql: str) -> pd.DataFrame: 
+    def extract_data(self, sql: str): 
         with connect_mysql(self._config) as db_conn:
             pd_data = pd.read_sql_query(sql, db_conn) 
             return pd_data

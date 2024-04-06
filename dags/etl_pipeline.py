@@ -4,8 +4,10 @@ from datetime import datetime
 
 from airflow.operators.python import PythonOperator
 
-# from .resources.minio_io_manager import MinioIOManager
-# from .resources.mysql_io_manager import MySQLIOManager
+# from mysql_io_manager import MySQLIOManager
+from resources.minio_io_manager import MinIOIOManager
+from resources.mysql_io_manager import MySQLIOManager
+from resources.psql_io_manager import PostgreSQLIOManager
 
 import os
 import random
@@ -18,105 +20,6 @@ from sqlalchemy import create_engine
 import pyarrow as pa
 import pyarrow.parquet as pq
 from minio import Minio
-
-@contextmanager
-def connect_mysql(config):
-    conn_info = (
-        f"mysql+pymysql://{config['user']}:{config['password']}" 
-        + f"@{config['host']}:{config['port']}"
-        + f"/{config['database']}"
-    )
-    db_conn = create_engine(conn_info) 
-    try:
-        yield db_conn 
-    except Exception:
-        raise
-
-class MySQLIOManager(): 
-    def __init__(self, config):
-        self._config = config
-
-    def handle_output(self):
-        pass
-
-    def load_input(self):
-        pass
-    
-    def extract_data(self, sql: str): 
-        with connect_mysql(self._config) as db_conn:
-            pd_data = pd.read_sql_query(sql, db_conn) 
-            return pd_data
-
-
-
-@contextmanager
-def connect_minio(config):
-    client = Minio(
-        endpoint=config.get("endpoint_url"), 
-        access_key=config.get("aws_access_key_id"),
-        secret_key=config.get("aws_secret_access_key"),
-        secure=False, 
-        )
-    try:
-        yield client
-    except Exception:
-        raise
-
-class MinIOIOManager():
-    def __init__(self, config):
-        self._config = config
-
-    def _get_path(self, context):
-        layer =  context["layer"]
-        schema = context["schema"]
-        table = context["table"]
-        key = "/".join([layer, schema, table.replace(f"{layer}_", "")])
-        tmp_file_path = "/tmp/file-{}-{}.parquet".format(
-            datetime.today().strftime("%Y%m%d%H%M%S"), "-".join([layer, schema, table])
-        )
-        print("-----------tmp_file_path-----------:", tmp_file_path)
-        
-        return f"{key}.pq", tmp_file_path
-    
-    def handle_output(self, context, obj):
-        key_name, tmp_file_path = self._get_path(context)
-        table = pa.Table.from_pandas(obj)
-        pq.write_table(table, tmp_file_path)
-
-        try:
-            bucket_name = self._config.get("bucket")
-            with connect_minio(self._config) as client:
-                found = client.bucket_exists(bucket_name)
-                if not found:
-                    client.make_bucket(bucket_name)
-                else:
-                    print(f"Bucket {bucket_name} already exists")
-                client.fput_object(bucket_name, key_name, tmp_file_path)
-                row_count = len(obj)
-                os.remove(tmp_file_path)
-                return {
-                    "path": key_name,
-                    "tmp": tmp_file_path
-                }
-                          
-        except Exception:
-            raise 
-    
-    def load_input(self, context):
-        bucket_name = self._config.get("bucket")
-        key_name, tmp_file_path = self._get_path(context)
-        try:
-            with connect_minio(self._config) as client:
-                found = client.bucket_exists(bucket_name)
-                if not found:
-                    client.make_bucket(bucket_name)
-                else:
-                    print(f"Bucket {bucket_name} already exists")
-                client.fget_object(bucket_name, key_name, tmp_file_path)
-                pd_data = pd.read_parquet(tmp_file_path)
-                return pd_data
-        except Exception:
-            raise
 
 
 MYSQL_CONFIG = {
@@ -134,6 +37,15 @@ MINIO_CONFIG = {
     "aws_secret_access_key": os.getenv("AWS_SECRET_ACCESS_KEY"),
 }
 
+PSQL_CONFIG = {
+    "host": os.getenv("POSTGRES_HOST"),
+    "port": os.getenv("POSTGRES_PORT"), 
+    "database": os.getenv("POSTGRES_DB"), 
+    "user": os.getenv("POSTGRES_USER"), 
+    "password": os.getenv("POSTGRES_PASSWORD"),
+}
+
+
 dag = DAG(
     dag_id='elt_pipeline',
     start_date= datetime(2024, 3, 19),
@@ -142,8 +54,9 @@ dag = DAG(
 
 mysql_io_manager = MySQLIOManager(MYSQL_CONFIG)
 minio_io_manager = MinIOIOManager(MINIO_CONFIG)
+psql_io_manager = PostgreSQLIOManager(PSQL_CONFIG)
 
-def bronze_olist_orders_dataset(ti):
+def bronze_olist_orders_dataset():
     print(MYSQL_CONFIG)
     sql_stm = "SELECT * FROM olist_orders_dataset LIMIT 10"
     pd_data = mysql_io_manager.extract_data(sql_stm)
