@@ -42,13 +42,6 @@ PSQL_CONFIG = {
     "password": os.getenv("POSTGRES_PASSWORD"),
 }
 
-
-# dag = DAG(
-#     dag_id='elt_pipeline',
-#     start_date= datetime(2024, 3, 19),
-#     schedule_interval=None
-# )
-
 mysql_io_manager = MySQLIOManager(MYSQL_CONFIG)
 minio_io_manager = MinIOIOManager(MINIO_CONFIG)
 psql_io_manager = PostgreSQLIOManager(PSQL_CONFIG)
@@ -57,26 +50,6 @@ bronze_layer = BronzeLayer(mysql_io_manager, minio_io_manager)
 silver_layer = SilverLayer(minio_io_manager)
 gold_layer = GoldLayer(minio_io_manager)
 
-# def bronze_funtions():
-#     bronze_layer = BronzeLayer(mysql_io_manager, minio_io_manager)
-#     ls_tables = [
-#         "olist_order_items_dataset",
-#         "olist_order_payments_dataset",
-#         "olist_orders_dataset",
-#         "olist_products_dataset",
-#         "product_category_name_translation",
-#     ]
-
-#     for dataset_name in ls_tables:
-#         tmp_file_path = bronze_layer.get_data_from_mysql(dataset_name)
-#         context = {
-#             "layer": "bronze",
-#             "schema": "ecom",
-#             "table": dataset_name
-#         }
-#         bronze_layer.transform_and_load_to_minio(tmp_file_path, context)
-
-
 ls_tables = [
     "olist_order_items_dataset",
     "olist_order_payments_dataset",
@@ -84,25 +57,6 @@ ls_tables = [
     "olist_products_dataset",
     "product_category_name_translation",
 ]
-
-
-
-# def get_data_from_minio():
-#     context = {
-#         "layer": "bronze",
-#         "schema": "public",
-#         "table": "item_order"
-#     }
-#     df = minio_io_manager.load_input(context)
-#     df.to_csv("/tmp/test_load_data.csv", index=False)
-
-# brone_layer_tasks = PythonOperator(
-#     task_id = "brone_layer_tasks",
-#     python_callable=bronze_funtions,
-#     dag=dag
-# )
-
-# brone_layer_tasks
 
 @dag(
     schedule_interval = None,
@@ -137,8 +91,6 @@ def data_piple_dag():
         return context
     bronze_context_list = {}
     for dataset_name in ls_tables:
-        # df = bronze_get_df_functions(dataset_name)
-        # bronze_transform_load_functions(df, dataset_name)
         bronze_context = bronze_function(dataset_name)
         bronze_context_list[f"{dataset_name}"] = bronze_context
 

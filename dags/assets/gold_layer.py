@@ -8,9 +8,6 @@ class GoldLayer():
             }
     
     def gold_sales_value_by_category(self, fact_sales, dim_products):
-        print("columns fact_sales", fact_sales.columns)
-        print("-----------------------------")
-        print("columns dim_products", dim_products.columns)
         fact_sales["order_purchase_timstamp"] = fact_sales[
             "order_purchase_timestamp"
         ].apply(lambda x: x.split()[0])
@@ -39,9 +36,6 @@ class GoldLayer():
                 }
             )
         )
-        print("----------------------------------------------------------------")
-        print(sales.info())
-        print("----------------------------------------------------------------")
         sales["value_per_bill"] = sales["sales"]/ sales["bills"]
         
 
